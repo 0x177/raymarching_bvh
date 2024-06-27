@@ -202,7 +202,7 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     let mut scene = vec![];
     
     let mut bvh = vec![
-	bvh::Node::new(Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),0,0),
+	bvh::Node::new(Vec3::new(100.0,100.0,100.0),-Vec3::new(100.0,100.0,100.0),0,0),
     ];
 
     for i in 0..100 {
@@ -218,7 +218,10 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 	    }
 	);
 	bvh[0].grow_to_include_object(&scene[i]);
+	bvh[0].object_count += 1;
     }
+
+    println!("{:?}",bvh);
 
     let camera: BvhCamera = BvhCamera {
 	pos: Vec3::new(0.0,0.0,-5.0),

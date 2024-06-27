@@ -12,7 +12,7 @@ use bevy::{
     },
 };
 
-const MAX_DEPTH: i32 = 1;
+const MAX_DEPTH: i32 = 10;
 
 #[derive(Resource)]
 pub struct RayMarcherBVHBindGroup(pub BindGroup);
@@ -24,13 +24,13 @@ pub struct Object {
     pub params: [f32; 12]
 }
 
-#[derive(Copy,ShaderType,Clone,Resource)]
+#[derive(Debug,Copy,ShaderType,Clone,Resource)]
 pub struct BvhCamera {
     pub pos: Vec3,
     pub rot: Vec2
 }
 
-#[derive(Copy,ShaderType,Clone,Resource)]
+#[derive(Debug,Copy,ShaderType,Clone,Resource)]
 pub struct Node {
     pub max_corner: Vec3,
     pub min_corner: Vec3,

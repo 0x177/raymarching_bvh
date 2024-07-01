@@ -6,7 +6,7 @@ use bevy::{
     },
 };
 
-const MAX_DEPTH: i32 = 2;
+const MAX_DEPTH: i32 = 3;
 
 #[derive(Resource)]
 pub struct RayMarcherBVHBindGroup(pub BindGroup);
@@ -124,6 +124,8 @@ impl RayMarcherData {
 
 	self.bvh.push(child_a);
 	self.bvh.push(child_b);
+
+	self.bvh[index as usize].object_count = 0;
 
 	self.split(self.bvh[index as usize].child_index,depth+1);
 	self.split(self.bvh[index as usize].child_index + 1,depth+1);

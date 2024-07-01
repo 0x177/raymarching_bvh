@@ -9,6 +9,6 @@ objects: 125 spheres in grid pattern
 | ---------- | ---- |
 | 0 (no bvh) |  11  |
 | 1          |  40  |
-| 5          |  15  |
+| 5          |  30  |
 
 the increase in fps when the bvh is at depth 1 is probably from the ray disregarding the entire scene when it does not intersect the root node

@@ -16,8 +16,8 @@ use bevy::{
 
 mod bvh;
 use bvh::*;
-mod bunny;
-use bunny::*;
+//mod bunny;
+//use bunny::*;
 
 use std::borrow::Cow;
 
@@ -25,7 +25,7 @@ use std::borrow::Cow;
 
 use iyes_perf_ui::prelude::*;
 
-const SIZE: (u32, u32) = (1920, 1080);
+const SIZE: (u32, u32) = (1280, 720);
 const WORKGROUP_SIZE: u32 = 8;
 
 #[derive(Resource)]
@@ -202,14 +202,18 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     let mut scene = vec![];
     
     let mut bvh = vec![
-	bvh::Node::new(Vec3::new(100.0,100.0,100.0),-Vec3::new(100.0,100.0,100.0),0,0),
+	bvh::Node::new(Vec3::new(0.0,0.0,0.0),-Vec3::new(0.0,0.0,0.0),0,0),
     ];
 
-    for i in 0..100 {
-	let x = i%10;
-	let y = i/10;
+    let n: usize = 5;
+    
+    for i in 0..n*n*n {
+	let x = i/(n*n);
+	let y = (i/n) % n;
+	let z = i%n;
 
-	let v = Vec3::new(x as f32*0.1,y as f32*0.1,-7.0);
+	let mut v = Vec3::new(x as f32*0.1,y as f32*0.1,-(z as f32)*0.1);
+	//v -= Vec3::new(1.0,1.0,0.0);
 	scene.push(
 	    Object {
 		pos: v,
@@ -218,21 +222,24 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 	    }
 	);
 	bvh[0].grow_to_include_object(&scene[i]);
-	bvh[0].object_count += 1;
     }
 
-    println!("{:?}",bvh);
-
+    bvh[0].object_count = (n*n*n) as u32;
+	
     let camera: BvhCamera = BvhCamera {
-	pos: Vec3::new(0.0,0.0,-5.0),
+	pos: Vec3::new(0.0,0.0,2.0),
 	rot: Vec2::new(0.0,0.0)
     };
     
     //please god let this be the last hack in this project
     let mut data =bvh::RayMarcherData {bvh,scene,camera};
     let mut temp = data.clone();
-    temp.split(&mut data.bvh[0],1);
+    temp.split(0,1);
     data = temp;
+
+    for node in &data.bvh {
+	println!("{}",node.object_count);
+    }
     
     commands.insert_resource(RayMarcherImage { texture: image });
 

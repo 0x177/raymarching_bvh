@@ -1,18 +1,12 @@
 use bevy::{
     prelude::*,
     render::{
-	//texture::{FallbackImage},
-        extract_resource::{ExtractResource, ExtractResourcePlugin},
-        render_asset::RenderAssetUsages,
-        render_asset::RenderAssets,
-        //render_graph::{self, RenderGraph, RenderLabel},
+        extract_resource::{ExtractResource},
         render_resource::*,
-        //renderer::{RenderContext, RenderDevice},
-        //Render, RenderApp, RenderSet,
     },
 };
 
-const MAX_DEPTH: i32 = 10;
+const MAX_DEPTH: i32 = 2;
 
 #[derive(Resource)]
 pub struct RayMarcherBVHBindGroup(pub BindGroup);
@@ -41,22 +35,24 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new(max_corner: Vec3,min_corner: Vec3,child_index: u32,object_index: u32) -> Self {
+    pub fn new(max_corner: Vec3,min_corner: Vec3,object_index: u32,object_count: u32) -> Self {
 	let centre = (max_corner+min_corner) * 0.5;
 
 	Self {
 	    max_corner,
 	    min_corner,
 	    centre,
-	    child_index,
+	    child_index: 0,
 	    object_index,
-	    object_count: 0,
+	    object_count,
 	}
     }
 
     pub fn grow_to_include(&mut self,p: Vec3) {
 	self.min_corner = self.min_corner.min(p);
 	self.max_corner = self.max_corner.max(p);
+
+	self.centre = (self.max_corner + self.min_corner) * 0.5;
     }
 
     pub fn grow_to_include_object(&mut self, obj: &Object) {
@@ -67,12 +63,15 @@ impl Node {
 
 		self.grow_to_include(sphere_max);
 		self.grow_to_include(sphere_min);
+
+		//self.object_count += 1;
 	    },
 
 	    1 => {
 		self.grow_to_include(Vec3::new(obj.params[0],obj.params[1],obj.params[2]));
 		self.grow_to_include(Vec3::new(obj.params[3],obj.params[4],obj.params[5]));
 		self.grow_to_include(Vec3::new(obj.params[6],obj.params[7],obj.params[8]));
+		//self.object_count += 1;
 	    }
 	    
 	    _ => {
@@ -94,35 +93,39 @@ pub struct RayMarcherData {
 }
 
 impl RayMarcherData {
-    pub fn split(&mut self,node:&mut Node,depth: i32) {
+    pub fn split(&mut self,index: u32,depth: i32) {
 	if depth == MAX_DEPTH {
 	    return;
 	}
+	
+	let node = self.bvh[index as usize].clone();
 
-	let aabb_size = node.max_corner-node.min_corner;
-	let split_axis = if aabb_size.x > aabb_size.y.max(aabb_size.z) {0} else {if aabb_size.y > aabb_size.z {1} else {2}};
-	let split_pos = node.centre[split_axis];
+	let size = node.max_corner - node.min_corner;
 
-	node.child_index = self.bvh.len() as u32;
-	let mut child_a = Node::new(Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),0,node.object_index);
-	let mut child_b = Node::new(Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),0,node.object_index);
+	let axis = if size.x > size.y.max(size.z) {0} else {if size.y > size.z {1} else {2}};
+	let split_pos = node.centre[axis];
 
-	for i in node.object_index..node.object_count {
-	    let object = &self.scene[i as usize];
-	    let side_a = object.pos[split_axis] < split_pos;
-	    let child = if side_a {&mut child_a} else {&mut child_b};
-	    child.grow_to_include_object(object);
+	let mut child_a = Node::new(Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),node.object_index,0);
+	self.bvh[index as usize].child_index = self.bvh.len() as u32;
+	let mut child_b = Node::new(Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),node.object_index,0);
+	
+	for i in node.object_index..node.object_index+node.object_count {
+	    let obj = self.scene[i as usize];
+	    let in_a = obj.pos[axis] < split_pos;
+	    let child = if in_a {&mut child_a} else {&mut child_b};
 	    child.object_count += 1;
-
-	    if side_a {
-		let temp = (child.object_index + child.object_count - 1) as usize;
-		let swap = self.scene[i as usize].clone();
-		self.scene[i as usize] = self.scene[temp];
-		self.scene[temp] = swap; 
+	    child.grow_to_include_object(&obj);
+	    if in_a {
+		let swap_index = child.object_index + child.object_count - 1;
+		self.scene.swap(i as usize,swap_index as usize);
+		child_b.object_index += 1;
 	    }
 	}
 
-	self.split(&mut child_a,depth+1);
-	self.split(&mut child_b,depth+1);
+	self.bvh.push(child_a);
+	self.bvh.push(child_b);
+
+	self.split(self.bvh[index as usize].child_index,depth+1);
+	self.split(self.bvh[index as usize].child_index + 1,depth+1);
     }
 }

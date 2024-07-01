@@ -78,7 +78,7 @@ fn object_distance(p: vec3<f32>,op: vec3<f32>,ty: f32,params: array<f32, 12>) ->
   if ty == 0.0 {
       dist = length(p-op)-params[0];
  } else if ty == 1.0 {
-      dist = triangle(p,vec3<f32>(params[0],params[1],params[2]),vec3<f32>(params[3],params[4],params[5]),vec3<f32>(params[6],params[7],params[8]));
+      dist = triangle(p,vec3<f32>(params[0],params[1],params[2]),vec3<f32>(params[3],params[4],params[5]),vec3<f32>(params[6],params[7],params[8]))-params[9];
  }
 
   return dist;
@@ -96,67 +96,47 @@ fn ray_aabb(min_corner: vec3<f32>,max_corner: vec3<f32>, ray: Ray) -> vec2<f32> 
 }
 
 fn traverse_bvh(ray: Ray) -> vec2<f32> {
-    var stack: array<u32,10> = array<u32,10>();
+    var min_dist: f32 = 9999.0;
+    var material: f32 = 0.0;
+
+    
     var index = 0;
-    stack[index] = u32(0);
+    var stack: array<Node,10> = array<Node,10>();
+    stack[index] = bvh[0];
     index += 1;
 
-    var min_dist = 999999.0;
-    var material = 0.0;
-
-    while (index > 0) {
+    while true {
 	index -= 1;
-	let node_index = stack[index];
-	let node = bvh[node_index];
+	let node = stack[index];
 
-	let intersection = ray_aabb(node.min_corner,node.max_corner,ray);
-	
-	//if intersection.x < min_dist {
-	if node.child_index == 0 {
-	    for (var i = node.object_index; i < node.object_index + node.object_count; i++) {
-		let object = scene[i];
-		let dist = object_distance(ray.ro,object.pos,object.ty,object.params);
-		min_dist = min(min_dist,dist);
-	    }
-	} else {
-	    let child_index_a: u32 = node.child_index;
-	    let child_a = bvh[child_index_a];
-	    //index += 1;
-	    let child_index_b: u32 = node.child_index + 1;
-	    let child_b = bvh[child_index_b];
-	    //index += 1;
-
-	    let dist_a = ray_aabb(child_a.min_corner,child_a.max_corner,ray).x;
-	    let dist_b = ray_aabb(child_b.min_corner,child_b.max_corner,ray).x;
-
-	    let a_is_nearest = dist_a < dist_b;
-	    // WHY THE FUCK DOES THIS LANGUAGE NOT HAVE A TURNARY OPERATOR OR AN EQUEVELANT ONE LINER
-	    var near = 0.0;
-	    var far = 0.0;
-	    
-	    if (a_is_nearest) {
-		near = dist_a;
-		far = dist_b;
-	    } else {
-		near = dist_b;
-		far = dist_a;
+	if ray_aabb(node.min_corner,node.max_corner,ray).x < min_dist {
+	    if node.object_count > 0 {
+		for (var i = node.object_index; i < node.object_index+node.object_count; i += u32(1)) {
+		    let obj = scene[i];
+		    min_dist = min(min_dist,object_distance(ray.ro,obj.pos,obj.ty,obj.params));
+		} 
 	    }
 
-	    var index_near = 0;
-	    var index_far = 0;
+	    if node.child_index > 0 {
+		let centre = (node.max_corner + node.min_corner) * 0.5;
+		let size = node.max_corner - node.min_corner;
+		var split_axis = 0;
 
-	    if (a_is_nearest) {
-		index_near = child_index_a;
-		index_far = child_index_b;
-	    } else {
-		index_near = child_index_a;
-		index_far = child_index_b;
+		if size.x > max(size.y,size.z) {split_axis = 0;} else {if size.y > size.z {split_axis = 1;} else {split_axis = 2;}};
+
+		var closest = 0;
+		
+		if ray.ro[split_axis] < centre[split_axis] {closest = 0;} else {closest = 1;};
+		stack[index] = bvh[node.child_index+1-u32(closest)];
+		index += 1;
+		stack[index] = bvh[node.child_index+  u32(closest)];
+		index += 1;
 	    }
-	    
-	}  
-	//  } 
+	}
+
+	if index == 0 {break;}
     }
-    
+
     return vec2<f32>(min_dist,material);
 }
 
